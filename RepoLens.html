@@ -1,0 +1,961 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>RepoLens</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout concept: a left-aligned instrument panel. One bold headline and query bar on top,
+   then a report that reads summary first (score ring + five sub-scores), detail after (charts, files). */
+:root{
+  color-scheme:dark;
+  --bg:#0a0f16; --surface:#111925; --surface-2:#182233; --line:#25344a;
+  --fg:#e6edf6; --muted:#93a4ba; --accent:#4f9bff; --accent-fg:#06101f;
+  --good:#3ecf8e; --warn:#f0b23d; --bad:#f2675f;
+  --c1:#4f9bff; --c2:#f0b23d; --c3:#3ecf8e; --c4:#e0699a; --c5:#9d8cff; --c6:#36c5d6; --c7:#ef8a50; --c8:#6b7a90;
+  --display:'Bricolage Grotesque',system-ui,sans-serif;
+  --body:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]){
+    color-scheme:light;
+    --bg:#f3f6fb; --surface:#ffffff; --surface-2:#eaf0f8; --line:#d4dded;
+    --fg:#0f1b2d; --muted:#54647b; --accent:#1f6feb; --accent-fg:#ffffff;
+    --good:#0e8a55; --warn:#a66a00; --bad:#c4352d;
+    --c1:#1f6feb; --c2:#b87800; --c3:#0e8a55; --c4:#c23c78; --c5:#6a55e0; --c6:#0f8ea0; --c7:#cc5a1e; --c8:#8795a9;
+  }
+}
+:root[data-theme="light"]{
+  color-scheme:light;
+  --bg:#f3f6fb; --surface:#ffffff; --surface-2:#eaf0f8; --line:#d4dded;
+  --fg:#0f1b2d; --muted:#54647b; --accent:#1f6feb; --accent-fg:#ffffff;
+  --good:#0e8a55; --warn:#a66a00; --bad:#c4352d;
+  --c1:#1f6feb; --c2:#b87800; --c3:#0e8a55; --c4:#c23c78; --c5:#6a55e0; --c6:#0f8ea0; --c7:#cc5a1e; --c8:#8795a9;
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0a0f16; --surface:#111925; --surface-2:#182233; --line:#25344a;
+  --fg:#e6edf6; --muted:#93a4ba; --accent:#4f9bff; --accent-fg:#06101f;
+  --good:#3ecf8e; --warn:#f0b23d; --bad:#f2675f;
+  --c1:#4f9bff; --c2:#f0b23d; --c3:#3ecf8e; --c4:#e0699a; --c5:#9d8cff; --c6:#36c5d6; --c7:#ef8a50; --c8:#6b7a90;
+}
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{
+  margin:0; background:var(--bg); color:var(--fg);
+  font:15px/1.55 var(--body); -webkit-font-smoothing:antialiased;
+  padding-block:0 56px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+}
+.shell{max-width:1120px;margin:0 auto}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* header */
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:18px 0;border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:10px;font:700 1.15rem var(--display);letter-spacing:-.01em}
+.mark{width:26px;height:26px;color:var(--accent)}
+.ghost{background:transparent;border:1px solid var(--line);border-radius:6px;padding:7px 12px;cursor:pointer;color:var(--fg);font-size:13px}
+.ghost:hover{background:var(--surface-2)}
+
+/* hero */
+.hero{padding:56px 0 28px}
+.eyebrow{margin:0 0 14px;font:500 12px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+h1{margin:0;font:700 clamp(2.2rem,6vw,3.9rem)/1.02 var(--display);letter-spacing:-.025em;max-width:19ch;text-wrap:balance}
+.lede{margin:18px 0 0;max-width:60ch;color:var(--muted);font-size:1.05rem}
+.query{margin-top:28px;display:flex;flex-wrap:wrap;align-items:stretch;gap:0;border:1px solid var(--line);background:var(--surface);border-radius:8px;overflow:hidden;max-width:680px}
+.query:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 25%,transparent)}
+.prefix{display:flex;align-items:center;padding:0 0 0 14px;font:400 14px var(--mono);color:var(--muted)}
+.query input{flex:1 1 180px;min-width:0;background:transparent;border:0;outline:0;padding:14px 10px;font:400 14px var(--mono)}
+.query input::placeholder{color:var(--muted);opacity:.7}
+.go{background:var(--accent);color:var(--accent-fg);border:0;padding:0 22px;min-height:48px;font-weight:600;cursor:pointer}
+.go:disabled{opacity:.6;cursor:progress}
+.chips{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:14px}
+.chips .lab{font:500 12px var(--mono);color:var(--muted);margin-right:4px}
+.chip{border:1px solid var(--line);background:transparent;border-radius:999px;padding:6px 12px;font:400 12.5px var(--mono);cursor:pointer;color:var(--fg)}
+.chip:hover{background:var(--surface-2)}
+.chip[aria-pressed="true"]{border-color:var(--accent);color:var(--accent)}
+.notice{margin:16px 0 0;max-width:680px;padding:12px 14px;border:1px solid var(--line);border-left:3px solid var(--warn);background:var(--surface);border-radius:6px;font-size:14px}
+.notice.info{border-left-color:var(--accent)}
+
+/* panels */
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:20px;min-width:0}
+.panel h2{margin:0;font:600 1.02rem var(--display);letter-spacing:-.005em}
+.panel .sub{margin:4px 0 16px;color:var(--muted);font-size:13px}
+.grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(min(100%,470px),1fr));margin-top:16px}
+.wide{grid-column:1/-1}
+
+/* progress */
+#progress{margin-top:8px}
+#steps{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+#steps li{display:grid;grid-template-columns:18px 1fr auto;gap:10px;align-items:center;font-size:14px}
+#steps .dot{width:10px;height:10px;border-radius:50%;border:2px solid var(--line);justify-self:center}
+#steps li[data-state="active"] .dot{border-color:var(--accent);background:var(--accent);animation:pulse 1s ease-in-out infinite}
+#steps li[data-state="done"] .dot{border-color:var(--good);background:var(--good)}
+#steps li[data-state="fail"] .dot{border-color:var(--bad);background:var(--bad)}
+#steps li[data-state="pending"]{color:var(--muted)}
+#steps .ms{font:400 12px var(--mono);color:var(--muted)}
+@keyframes pulse{50%{opacity:.35}}
+
+/* report head */
+.rhead{display:grid;gap:28px;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);margin-top:8px}
+.rname{margin:0;font:500 1.05rem var(--mono);overflow-wrap:anywhere}
+.rtitle{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.badge{font:500 11px var(--mono);letter-spacing:.06em;text-transform:uppercase;padding:4px 7px;border-radius:3px;background:var(--surface-2);color:var(--muted);border:1px solid var(--line)}
+.rdesc{margin:10px 0 0;color:var(--muted);max-width:56ch}
+.facts{list-style:none;padding:0;margin:18px 0 0;display:flex;flex-wrap:wrap;gap:8px 18px;font-size:13px;color:var(--muted)}
+.facts b{color:var(--fg);font-weight:600;font-variant-numeric:tabular-nums}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin-top:22px}
+.stat{border:1px solid var(--line);background:var(--surface-2);border-radius:6px;padding:12px 14px}
+.stat b{display:block;font:700 1.6rem/1.1 var(--display);font-variant-numeric:tabular-nums}
+.stat span{font-size:12px;color:var(--muted)}
+.actions{margin-top:18px;display:flex;flex-wrap:wrap;align-items:center;gap:12px}
+#copyMsg{font-size:13px;color:var(--muted);overflow-wrap:anywhere;min-width:0}
+.scorebox{display:flex;align-items:center;gap:20px}
+.ring{position:relative;width:124px;height:124px;flex:none}
+.ring svg{width:100%;height:100%;display:block}
+.ring .num{position:absolute;inset:0;display:grid;place-content:center;text-align:center;font:700 2.3rem/1 var(--display);font-variant-numeric:tabular-nums}
+.ring .num small{display:block;margin-top:4px;font:400 11px var(--mono);color:var(--muted)}
+#ringArc{transition:stroke-dashoffset .9s cubic-bezier(.2,.7,.2,1)}
+.grade{font:700 1.5rem var(--display);margin:0}
+.gradesub{margin:4px 0 0;color:var(--muted);font-size:13px;max-width:30ch}
+.bars{list-style:none;margin:20px 0 0;padding:0;display:grid;gap:14px}
+.brow{display:flex;justify-content:space-between;gap:12px;font-size:13.5px;font-weight:500}
+.bv{font:500 13px var(--mono);font-variant-numeric:tabular-nums}
+.track{height:6px;border-radius:3px;background:var(--surface-2);margin-top:6px;overflow:hidden}
+.fill{height:100%;border-radius:3px;background:var(--accent)}
+.fill.good{background:var(--good)} .fill.warn{background:var(--warn)} .fill.bad{background:var(--bad)}
+.bn{margin:5px 0 0;font-size:12.5px;color:var(--muted)}
+
+/* donut */
+.donutwrap{position:relative;width:176px;height:176px;margin:0 auto 16px}
+.donut{width:100%;height:100%;display:block}
+.dcenter{position:absolute;inset:0;display:grid;place-content:center;text-align:center}
+.dcenter b{font:700 1.5rem var(--display)}
+.dcenter span{font:400 11px var(--mono);color:var(--muted);max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.legend{list-style:none;margin:0;padding:0;display:grid;gap:6px;font-size:13.5px}
+.legend li{display:grid;grid-template-columns:12px minmax(0,1fr) auto;gap:10px;align-items:center}
+.sw{width:10px;height:10px;border-radius:2px;display:inline-block}
+.ln{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lp{font:400 12.5px var(--mono);color:var(--muted);font-variant-numeric:tabular-nums}
+
+/* activity */
+.actchart{display:block;width:100%;height:150px}
+.axis{display:flex;justify-content:space-between;gap:8px;margin-top:6px;font:400 11.5px var(--mono);color:var(--muted)}
+.actmeta{display:flex;flex-wrap:wrap;gap:6px 20px;margin:14px 0 0;font-size:13px;color:var(--muted)}
+.actmeta b{color:var(--fg);font-variant-numeric:tabular-nums}
+
+/* treemap */
+#treemap{position:relative;width:100%;height:clamp(250px,40vw,340px);border-radius:6px;overflow:hidden;background:var(--surface-2)}
+.cell{position:absolute;overflow:hidden;padding:6px 8px;border:1px solid var(--surface);border-left-width:3px;
+  background:color-mix(in srgb,var(--cc) 24%,var(--surface));border-left-color:var(--cc);cursor:default;font-size:12px;line-height:1.3}
+.cell:hover,.cell:focus-visible{background:color-mix(in srgb,var(--cc) 40%,var(--surface))}
+.cell .cn{display:block;font:500 12px var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cell .cs{display:block;color:var(--muted);font:400 11px var(--mono)}
+#tmInfo{min-height:1.5em;margin:12px 0 0;font:400 12.5px var(--mono);color:var(--muted);overflow-wrap:anywhere}
+.legend.inline{grid-template-columns:repeat(auto-fill,minmax(180px,230px));gap:6px 28px;margin-top:12px}
+
+/* findings */
+.fgroup+.fgroup{margin-top:18px}
+.fgroup h3{display:flex;align-items:center;gap:8px;margin:0 0 8px;font:600 13px var(--body)}
+.pill{font:500 11px/1 var(--mono);text-transform:uppercase;letter-spacing:.06em;padding:4px 6px;border-radius:3px;border:1px solid currentColor}
+.pill.good{color:var(--good)} .pill.bad{color:var(--bad)} .pill.tip{color:var(--accent)}
+.fgroup ul{margin:0;padding:0 0 0 18px;display:grid;gap:7px;font-size:14px}
+.fgroup li::marker{color:var(--muted)}
+
+/* largest + explorer */
+.lf{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+.lf .row{display:flex;justify-content:space-between;gap:12px;font:400 12.5px var(--mono)}
+.lf .pth{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.lf .sz{color:var(--muted);flex:none;font-variant-numeric:tabular-nums}
+.lf .track{margin-top:5px}
+.fxc{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px}
+.fxc input,.fxc select{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:9px 11px;font-size:13.5px}
+.fxc input{flex:1 1 220px;min-width:0;font-family:var(--mono)}
+#fxCount{margin:0 0 8px;font-size:12.5px;color:var(--muted)}
+.fxlist{max-height:380px;overflow:auto;border:1px solid var(--line);border-radius:6px}
+.fxrow{display:grid;grid-template-columns:52px minmax(0,1fr) auto;gap:10px;align-items:center;padding:7px 10px;font:400 12.5px var(--mono);border-bottom:1px solid var(--line)}
+.fxrow:last-child{border-bottom:0}
+.fxrow .tag{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.fxrow .tag.t-test{color:var(--good)} .fxrow .tag.t-source{color:var(--accent)}
+.fxrow .p{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fxrow .p em{font-style:normal;color:var(--muted)}
+.fxrow .s{color:var(--muted);font-variant-numeric:tabular-nums}
+.empty{margin:0;color:var(--muted);font-size:14px}
+
+/* method */
+.method{margin-top:40px}
+.method h2{font:700 1.4rem var(--display);margin:0 0 6px;letter-spacing:-.01em}
+.tablewrap{overflow-x:auto;margin-top:14px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;min-width:560px;font-size:13.5px}
+th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+th{font:500 11.5px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+td.w{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.fine{margin:14px 0 0;color:var(--muted);font-size:13px;max-width:70ch}
+footer{margin-top:36px;padding-top:18px;border-top:1px solid var(--line);color:var(--muted);font-size:13px}
+
+@media (max-width:760px){.rhead{grid-template-columns:1fr}.hero{padding-top:36px}}
+@media (max-width:480px){.scorebox{flex-direction:column;align-items:flex-start}.prefix{display:none}.query input{padding-left:14px}.go{flex:1 1 100%}.panel{padding:16px}}
+@media (prefers-reduced-motion:reduce){#ringArc{transition:none}#steps li[data-state="active"] .dot{animation:none}}
+</style>
+
+<div class="shell">
+  <header class="top">
+    <div class="brand">
+      <svg class="mark" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M15 15l5.5 5.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M7.5 8.5h5M7.5 11.5h3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <span>RepoLens</span>
+    </div>
+    <button class="ghost" id="themeBtn" type="button">Light mode</button>
+  </header>
+
+  <main>
+    <section class="hero">
+      <p class="eyebrow">GitHub repository analyzer</p>
+      <h1>Understand any codebase in 60 seconds</h1>
+      <p class="lede">Paste a public GitHub repository. RepoLens reads its languages, file tree and commit history, then scores structure, documentation, testing, maintainability and activity, and shows where the code weighs most.</p>
+
+      <form id="form" class="query" autocomplete="off">
+        <label for="repoInput" class="sr">GitHub repository</label>
+        <span class="prefix" aria-hidden="true">github.com/</span>
+        <input id="repoInput" type="text" placeholder="owner/repository" spellcheck="false" autocapitalize="off">
+        <button class="go" id="goBtn" type="submit">Analyze</button>
+      </form>
+      <div class="chips" id="chips"><span class="lab">Sample projects</span></div>
+      <p class="notice info" id="notice" role="status" hidden></p>
+    </section>
+
+    <section class="panel" id="progress" hidden aria-live="polite">
+      <h2>Analysis pipeline</h2>
+      <p class="sub" id="progressSub">Fetching from the GitHub API</p>
+      <ol id="steps"></ol>
+    </section>
+
+    <section id="report" hidden>
+      <div class="panel rhead">
+        <div>
+          <div class="rtitle"><p class="rname" id="rName"></p><span class="badge" id="rBadge" hidden>Sample data</span></div>
+          <p class="rdesc" id="rDesc"></p>
+          <ul class="facts" id="rFacts"></ul>
+          <div class="stats" id="rStats"></div>
+          <div class="actions">
+            <button class="ghost" id="copyBtn" type="button">Copy link to this report</button>
+            <span id="copyMsg" role="status"></span>
+          </div>
+        </div>
+        <div>
+          <div class="scorebox">
+            <div class="ring">
+              <svg viewBox="0 0 120 120" aria-hidden="true"><g transform="rotate(-90 60 60)"><circle cx="60" cy="60" r="52" fill="none" stroke="var(--surface-2)" stroke-width="10"/><circle id="ringArc" cx="60" cy="60" r="52" fill="none" stroke="var(--accent)" stroke-width="10" stroke-linecap="round"/></g></svg>
+              <div class="num"><span id="ringNum">0</span><small>/ 100</small></div>
+            </div>
+            <div>
+              <p class="grade" id="gradeWord"></p>
+              <p class="gradesub">Overall health, weighted across the five checks below.</p>
+            </div>
+          </div>
+          <ul class="bars" id="bars"></ul>
+        </div>
+      </div>
+
+      <div class="grid">
+        <div class="panel"><h2>Languages</h2><p class="sub">Share of code by bytes, as reported by GitHub</p><div id="langs"></div></div>
+        <div class="panel"><h2>Commit activity</h2><p class="sub">Commits per week over the last year</p><div id="activity"></div></div>
+        <div class="panel wide">
+          <h2>Where the code weighs most</h2>
+          <p class="sub">Largest source and test files, grouped by top-level folder. Hover or focus a block for its path.</p>
+          <div id="treemap" role="group" aria-label="Treemap of the largest source files"></div>
+          <p id="tmInfo" aria-live="polite"></p>
+          <ul class="legend inline" id="tmLegend"></ul>
+        </div>
+        <div class="panel"><h2>What stands out</h2><p class="sub">Generated from the signals above</p><div id="findings"></div></div>
+        <div class="panel"><h2>Largest files</h2><p class="sub">Excluding vendored and lock files</p><ul class="lf" id="largest"></ul></div>
+        <div class="panel wide">
+          <h2>File explorer</h2>
+          <p class="sub">Search every file in the repository tree</p>
+          <div class="fxc">
+            <label class="sr" for="fxQ">Filter files</label>
+            <input id="fxQ" type="search" placeholder="Filter by path, e.g. controller or .test." spellcheck="false">
+            <label class="sr" for="fxType">File type</label>
+            <select id="fxType">
+              <option value="all">All files</option><option value="source">Source</option><option value="test">Tests</option>
+              <option value="docs">Docs</option><option value="config">Config</option><option value="asset">Assets</option>
+            </select>
+          </div>
+          <p id="fxCount"></p>
+          <div class="fxlist" id="fxList"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="method">
+      <h2>How the score works</h2>
+      <p class="fine" style="margin-top:0">Each check gives 0 to 100. The overall score is the weighted average. These are heuristics from file names, sizes and commit counts, so treat them as a fast first read, not a code review. Lines of code are estimated from file sizes.</p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Check</th><th>Weight</th><th>What it looks at</th></tr></thead>
+          <tbody>
+            <tr><td>Structure</td><td class="w">20%</td><td>Files in the repository root, number of folders, nesting depth, dependency manifest, .gitignore, and whether one folder holds most of the code.</td></tr>
+            <tr><td>Documentation</td><td class="w">20%</td><td>README presence and length, LICENSE, a docs folder, CONTRIBUTING and CHANGELOG files.</td></tr>
+            <tr><td>Testing</td><td class="w">25%</td><td>Test files as a share of source files, plus a CI configuration that can run them.</td></tr>
+            <tr><td>Maintainability</td><td class="w">20%</td><td>Source files over 30 KB, CI, linter or formatter config, and a committed lock file.</td></tr>
+            <tr><td>Activity</td><td class="w">15%</td><td>Time since the last push and how many of the last 26 weeks had commits.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer>RepoLens runs in your browser and calls GitHub's public API, which allows 60 requests per hour without a token. Source code is never downloaded, only the file tree.</footer>
+</div>
+
+<script>
+/* ---------- Logic (pure functions) ---------- */
+const CODE = new Set('js jsx ts tsx mjs cjs py rb go rs java kt kts scala c h cc cpp hpp cs php swift m mm dart lua sh bash zsh sql vue svelte ex exs erl hs clj r jl pl css scss sass less html'.split(' '));
+const ASSET = new Set('png jpg jpeg gif svg ico webp avif bmp mp4 mov mp3 wav ogg woff woff2 ttf otf eot pdf zip gz tar jar bin exe dll so dylib psd ai'.split(' '));
+const DOCEXT = new Set('md mdx rst txt adoc'.split(' '));
+const CONF = new Set('json yml yaml toml ini cfg conf xml gradle properties'.split(' '));
+const IGNORE = /(^|\/)(node_modules|vendor|dist|build|out|target|\.git|\.next|\.venv|venv|__pycache__|coverage|bower_components|third_party)\/|\.min\.(js|css)$/i;
+const LOCK = /(^|\/)(package-lock\.json|yarn\.lock|pnpm-lock\.yaml|poetry\.lock|Pipfile\.lock|Cargo\.lock|composer\.lock|Gemfile\.lock|go\.sum|bun\.lockb)$/i;
+const TESTRE = /(^|\/)(tests?|__tests__|specs?|e2e|cypress)\/|\.(test|spec)\.[a-z0-9]+$|_test\.(go|py|rb|js|ts)$|(^|\/)test_[^/]+\.py$/i;
+const CIRE = /^(\.github\/workflows\/[^/]+\.ya?ml|\.gitlab-ci\.yml|\.circleci\/config\.yml|Jenkinsfile|azure-pipelines\.yml|\.travis\.yml|bitbucket-pipelines\.yml)$/;
+const LINTRE = /(^|\/)(\.eslintrc[^/]*|eslint\.config\.[^/]+|\.prettierrc[^/]*|prettier\.config\.[^/]+|ruff\.toml|\.flake8|\.pylintrc|\.rubocop\.yml|\.golangci\.ya?ml|biome\.json|\.editorconfig|tslint\.json|phpcs\.xml[^/]*|\.stylelintrc[^/]*)$/i;
+const MANIFEST = /(^|\/)(package\.json|requirements\.txt|pyproject\.toml|setup\.py|go\.mod|Cargo\.toml|pom\.xml|build\.gradle(\.kts)?|composer\.json|Gemfile|mix\.exs|pubspec\.yaml)$/i;
+const BIG = 30 * 1024;
+
+const sum = (a, k) => a.reduce((t, x) => t + x[k], 0);
+const clamp = (n, lo = 0, hi = 100) => Math.max(lo, Math.min(hi, n));
+const plural = (n, w) => n + ' ' + w + (n === 1 ? '' : 's');
+const pct = (r) => Math.round(r * 100) + '%';
+function fmtBytes(b) {
+  if (b < 1024) return b + ' B';
+  if (b < 1048576) return (b / 1024).toFixed(b < 10240 ? 1 : 0) + ' KB';
+  return (b / 1048576).toFixed(1) + ' MB';
+}
+function timeAgo(iso) {
+  const d = (Date.now() - Date.parse(iso)) / 864e5;
+  if (!isFinite(d)) return 'unknown';
+  if (d < 1) return 'today';
+  if (d < 30) return Math.round(d) + ' days ago';
+  if (d < 365) return plural(Math.round(d / 30), 'month') + ' ago';
+  return plural(Math.round(d / 365 * 10) / 10, 'year') + ' ago';
+}
+
+function parseRepo(s) {
+  s = (s || '').trim().replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/^github\.com\//i, '');
+  const m = s.match(/^([A-Za-z0-9][A-Za-z0-9-]{0,38})\/([A-Za-z0-9._-]{1,100}?)(?:\.git)?(?:[\/?#].*)?$/);
+  return m ? { owner: m[1], repo: m[2] } : null;
+}
+
+function classify(p) {
+  if (IGNORE.test(p)) return 'vendor';
+  if (LOCK.test(p)) return 'lock';
+  const base = p.toLowerCase().split('/').pop();
+  const ext = base.includes('.') ? base.split('.').pop() : '';
+  if (ASSET.has(ext)) return 'asset';
+  if (CODE.has(ext)) return TESTRE.test(p) ? 'test' : 'source';
+  if (DOCEXT.has(ext) || /^(readme|license|licence|copying|contributing|changelog|code_of_conduct|security)/.test(base)) return 'docs';
+  if (CONF.has(ext) || base.startsWith('.') || /^(dockerfile|makefile|procfile|jenkinsfile)$/.test(base)) return 'config';
+  return 'other';
+}
+
+function analyze(data) {
+  const files = data.files.map(f => ({ path: f.path, size: f.size, type: classify(f.path) }));
+  const own = files.filter(f => f.type !== 'vendor');
+  const src = own.filter(f => f.type === 'source');
+  const tests = own.filter(f => f.type === 'test');
+  const root = own.filter(f => !f.path.includes('/'));
+  const rootFind = re => root.find(f => re.test(f.path));
+  const readme = rootFind(/^readme(\.[a-z]+)?$/i);
+  const ci = own.find(f => CIRE.test(f.path));
+  const dirs = new Set();
+  let maxDepth = 0;
+  own.forEach(f => {
+    const parts = f.path.split('/');
+    maxDepth = Math.max(maxDepth, parts.length - 1);
+    for (let i = 1; i < parts.length; i++) dirs.add(parts.slice(0, i).join('/'));
+  });
+  const topCount = {};
+  src.forEach(f => { const k = f.path.includes('/') ? f.path.split('/')[0] : '(root)'; topCount[k] = (topCount[k] || 0) + 1; });
+  const topShare = src.length ? Math.max(...Object.values(topCount)) / src.length : 0;
+  const big = src.filter(f => f.size > BIG).sort((a, b) => b.size - a.size);
+  const weekly = data.weekly && data.weekly.length ? data.weekly : null;
+  const activeWeeks = weekly ? weekly.slice(-26).filter(w => w.total > 0).length : null;
+  const staleDays = data.meta.pushed_at ? (Date.now() - Date.parse(data.meta.pushed_at)) / 864e5 : null;
+
+  const f = {
+    total: own.length, srcCount: src.length, testCount: tests.length,
+    testRatio: src.length ? tests.length / src.length : 0,
+    srcBytes: sum(src, 'size'), rootFiles: root.length, dirCount: dirs.size, maxDepth, topShare,
+    hasReadme: !!readme, readmeSize: readme ? readme.size : 0,
+    hasLicense: !!rootFind(/^(license|licence|copying)(\.[a-z]+)?$/i),
+    hasContributing: !!rootFind(/^contributing/i), hasChangelog: !!rootFind(/^(changelog|changes|history)/i),
+    hasDocsDir: own.some(x => /^docs?\//i.test(x.path)),
+    hasCI: !!ci, ciPath: ci ? ci.path : '',
+    hasLint: own.some(x => LINTRE.test(x.path)),
+    hasLock: files.some(x => x.type === 'lock'),
+    hasManifest: own.some(x => MANIFEST.test(x.path)),
+    hasGitignore: !!rootFind(/^\.gitignore$/),
+    big, activeWeeks, staleDays, truncated: !!data.truncated,
+    pushedAgo: data.meta.pushed_at ? timeAgo(data.meta.pushed_at) : 'unknown'
+  };
+
+  // Structure
+  let st = 30;
+  if (f.hasManifest) st += 15;
+  if (f.hasGitignore) st += 10;
+  st += f.rootFiles <= 12 ? 15 : f.rootFiles <= 25 ? 8 : 0;
+  st += f.dirCount >= 6 ? 15 : f.dirCount >= 3 ? 8 : f.dirCount >= 1 ? 3 : 0;
+  st += f.maxDepth <= 6 ? 5 : f.maxDepth <= 8 ? 2 : -10;
+  if (f.srcCount >= 30 && f.topShare > 0.6) st -= 10;
+  // Documentation
+  let dc = 0;
+  if (f.hasReadme) dc += 30 + (f.readmeSize >= 2000 ? 15 : f.readmeSize >= 600 ? 8 : 0);
+  if (f.hasLicense) dc += 15;
+  if (f.hasDocsDir) dc += 15;
+  if (f.hasContributing) dc += 8;
+  if (f.hasChangelog) dc += 7;
+  // Testing
+  let ts = f.srcCount ? Math.min(80, f.testRatio / 0.4 * 80) : 0;
+  if (f.testRatio >= 0.4) ts += 8;
+  if (f.hasCI) ts += 12;
+  // Maintainability
+  const largeShare = f.srcCount ? big.length / f.srcCount : 0;
+  let mt = 25 + (f.hasCI ? 18 : 0) + (f.hasLint ? 12 : 0) + (f.hasLock ? 10 : 0) + 25 * (1 - Math.min(1, largeShare / 0.1));
+  // Activity
+  const rec = f.staleDays == null ? 15 : f.staleDays <= 30 ? 50 : f.staleDays <= 90 ? 40 : f.staleDays <= 180 ? 28 : f.staleDays <= 365 ? 15 : 5;
+  const ac = weekly ? rec + f.activeWeeks / 26 * 45 : rec * 1.9;
+
+  const subs = [
+    { key: 'structure', label: 'Structure', weight: .20, score: Math.round(clamp(st)),
+      note: plural(f.rootFiles, 'file') + ' in root, ' + plural(f.dirCount, 'folder') + ', depth ' + f.maxDepth },
+    { key: 'docs', label: 'Documentation', weight: .20, score: Math.round(clamp(dc)),
+      note: (f.hasReadme ? 'README ' + fmtBytes(f.readmeSize) : 'No README') + (f.hasLicense ? ', license' : ', no license') + (f.hasDocsDir ? ', docs folder' : '') },
+    { key: 'testing', label: 'Testing', weight: .25, score: Math.round(clamp(ts)),
+      note: plural(f.testCount, 'test file') + ' for ' + plural(f.srcCount, 'source file') + (f.hasCI ? ', CI on' : ', no CI') },
+    { key: 'maint', label: 'Maintainability', weight: .20, score: Math.round(clamp(mt)),
+      note: plural(big.length, 'source file') + ' over 30 KB' + (f.hasLint ? ', linter set up' : ', no linter config') },
+    { key: 'activity', label: 'Activity', weight: .15, score: Math.round(clamp(ac)),
+      note: 'Last push ' + f.pushedAgo + (weekly ? ', ' + f.activeWeeks + ' of last 26 weeks active' : ', commit history unavailable') }
+  ];
+  const overall = Math.round(subs.reduce((t, s) => t + s.score * s.weight, 0));
+  return { files, own, f, subs, overall, notes: findings(f) };
+}
+
+function findings(f) {
+  const S = [], R = [], T = [];
+  if (f.hasCI) S.push('Continuous integration is set up (' + f.ciPath + ').');
+  if (f.testRatio >= 0.2) S.push('Test files are ' + pct(f.testRatio) + ' of the source file count, a healthy ratio.');
+  if (f.readmeSize >= 2000) S.push('The README is substantial at ' + fmtBytes(f.readmeSize) + '.');
+  if (f.hasLicense) S.push('A license file is present, so others know how they may use the code.');
+  if (f.activeWeeks != null && f.activeWeeks >= 13) S.push('Commits landed in ' + f.activeWeeks + ' of the last 26 weeks.');
+  if (f.hasLint) S.push('Linter or formatter configuration is committed.');
+  if (f.hasDocsDir) S.push('There is a docs folder beyond the README.');
+  if (!f.srcCount) R.push('No source files were recognised, so testing and size checks could not run.');
+  else if (!f.testCount) {
+    R.push('No test files found, so changes cannot be checked automatically.');
+    T.push('Write tests for the most-used module first, then run them on every pull request.');
+  } else if (f.testRatio < 0.1) {
+    R.push('Only ' + plural(f.testCount, 'test file') + ' for ' + plural(f.srcCount, 'source file') + ' (' + pct(f.testRatio) + ').');
+    T.push('Add tests next to the largest or most-changed modules first.');
+  }
+  if (!f.hasCI) {
+    R.push('No CI configuration detected.');
+    T.push('Add a workflow such as .github/workflows/ci.yml that installs dependencies, lints and runs tests.');
+  }
+  if (f.big.length) {
+    R.push(plural(f.big.length, 'source file') + ' exceed 30 KB. The largest is ' + f.big[0].path + ' at ' + fmtBytes(f.big[0].size) + '.');
+    T.push('Split the largest files by responsibility. Smaller modules are easier to review and test.');
+  }
+  if (!f.hasReadme) {
+    R.push('No README at the repository root.');
+    T.push('Add a README covering what the project does, how to run it and how to test it.');
+  } else if (f.readmeSize < 600) {
+    R.push('The README is only ' + fmtBytes(f.readmeSize) + '.');
+    T.push('Expand the README with setup steps, usage examples and a short architecture note.');
+  }
+  if (!f.hasLicense) {
+    R.push('No license file, so others cannot clearly reuse the code.');
+    T.push('Add a LICENSE file. MIT and Apache-2.0 are common choices.');
+  }
+  if (f.staleDays != null && f.staleDays > 365) {
+    R.push('The last push was ' + f.pushedAgo + '.');
+    T.push('If the project is still used, schedule dependency updates. If not, archive it and say so in the README.');
+  }
+  if (f.rootFiles > 25) {
+    R.push(f.rootFiles + ' files sit in the repository root.');
+    T.push('Move scripts and config into folders so the top level is readable.');
+  }
+  if (f.truncated) R.push('GitHub truncated the file tree for this large repository, so counts are partial.');
+  return { S, R, T: T.slice(0, 4) };
+}
+
+function squarify(items, x, y, w, h) {
+  items = items.filter(i => i.value > 0);
+  const total = sum(items, 'value');
+  if (!total || w <= 0 || h <= 0) return [];
+  const k = (w * h) / total;
+  const nodes = items.map(i => Object.assign({}, i, { area: i.value * k }));
+  const out = [];
+  let rect = { x, y, w, h }, row = [];
+  const worst = (r, side) => {
+    const s = sum(r, 'area'), mx = Math.max(...r.map(a => a.area)), mn = Math.min(...r.map(a => a.area));
+    return Math.max(side * side * mx / (s * s), s * s / (side * side * mn));
+  };
+  const layout = (r) => {
+    const s = sum(r, 'area');
+    if (rect.w >= rect.h) {
+      const cw = s / rect.h; let cy = rect.y;
+      r.forEach(n => { const ch = n.area / cw; out.push(Object.assign({}, n, { x: rect.x, y: cy, w: cw, h: ch })); cy += ch; });
+      rect = { x: rect.x + cw, y: rect.y, w: rect.w - cw, h: rect.h };
+    } else {
+      const rh = s / rect.w; let cx = rect.x;
+      r.forEach(n => { const rw = n.area / rh; out.push(Object.assign({}, n, { x: cx, y: rect.y, w: rw, h: rh })); cx += rw; });
+      rect = { x: rect.x, y: rect.y + rh, w: rect.w, h: rect.h - rh };
+    }
+  };
+  let i = 0;
+  while (i < nodes.length) {
+    const side = Math.min(rect.w, rect.h), n = nodes[i];
+    if (!row.length || worst(row.concat(n), side) <= worst(row, side)) { row.push(n); i++; }
+    else { layout(row); row = []; }
+  }
+  if (row.length) layout(row);
+  return out;
+}
+
+/* ---------- Sample projects (bundled so the page works offline) ---------- */
+function mk(list) { return list.trim().split('\n').map(l => { const i = l.lastIndexOf(':'); return { path: l.slice(0, i).trim(), size: +l.slice(i + 1) }; }); }
+function weeks(n, fn) { const now = Math.floor(Date.now() / 1000); return Array.from({ length: n }, (_, i) => ({ week: now - (n - 1 - i) * 604800, total: Math.max(0, Math.round(fn(i))) })); }
+const daysAgo = d => new Date(Date.now() - d * 864e5).toISOString();
+
+const SAMPLE_LIST = [
+  { key: 'inventory-api', label: 'inventory-api · Node' },
+  { key: 'legacy-crm', label: 'legacy-crm · PHP' },
+  { key: 'ml-pipeline', label: 'ml-pipeline · Python' }
+];
+function buildSample(key) {
+  if (key === 'inventory-api') return {
+    sample: true, key, files: mk(`
+README.md:5400
+LICENSE:1070
+CONTRIBUTING.md:1900
+CHANGELOG.md:2600
+.gitignore:140
+.editorconfig:90
+.eslintrc.json:710
+.prettierrc:70
+Dockerfile:610
+package.json:1650
+package-lock.json:238000
+.github/workflows/ci.yml:980
+docs/architecture.md:4300
+docs/api.md:8100
+src/index.js:1900
+src/app.js:2700
+src/config/index.js:1500
+src/db/pool.js:1300
+src/db/migrations/001_init.sql:3200
+src/db/migrations/002_orders.sql:2100
+src/routes/items.js:5200
+src/routes/orders.js:6100
+src/routes/auth.js:3900
+src/controllers/itemController.js:7400
+src/controllers/orderController.js:9100
+src/services/stockService.js:8800
+src/services/pricingService.js:5600
+src/services/reportBuilder.js:34200
+src/middleware/auth.js:2300
+src/middleware/rateLimit.js:1700
+src/middleware/errorHandler.js:1400
+src/utils/logger.js:900
+src/utils/validate.js:2100
+tests/items.test.js:4800
+tests/orders.test.js:5900
+tests/auth.test.js:3700
+tests/stockService.test.js:6100
+tests/pricingService.test.js:3300
+tests/helpers/fixtures.js:2200`),
+    languages: { JavaScript: 78000, SQL: 5300, Dockerfile: 610 },
+    weekly: weeks(52, i => (i % 6 === 0 ? 0 : 6 + 5 * Math.sin(i / 3) + (i % 5))),
+    meta: { full_name: 'sample/inventory-api', description: 'Stock-level REST API with orders, auth and rate limiting. Bundled sample data.', license: 'MIT', default_branch: 'main', pushed_at: daysAgo(6) }
+  };
+  if (key === 'legacy-crm') return {
+    sample: true, key, files: mk(`
+readme.txt:380
+.gitignore:60
+index.php:12400
+config.php:2100
+functions.php:48200
+db.php:6900
+login.php:5200
+logout.php:700
+customers.php:39800
+customer_edit.php:22100
+customer_view.php:17800
+invoices.php:54300
+invoice_pdf.php:31200
+reports.php:62500
+report_export.php:14300
+admin/users.php:26100
+admin/settings.php:11800
+admin/backup.php:9300
+includes/header.php:3900
+includes/footer.php:1100
+includes/auth.php:4700
+includes/mailer.php:8600
+assets/css/style.css:44100
+assets/js/app.js:36800
+assets/js/jquery.min.js:87000
+assets/img/logo.png:18400
+assets/img/bg.jpg:212000
+old/customers_v1.php:21400
+old/invoices_old.php:33900`),
+    languages: { PHP: 340000, JavaScript: 124000, CSS: 44100 },
+    weekly: weeks(52, () => 0),
+    meta: { full_name: 'sample/legacy-crm', description: 'Ten-year-old customer and invoice manager. Bundled sample data.', license: null, default_branch: 'master', pushed_at: daysAgo(912) }
+  };
+  return {
+    sample: true, key: 'ml-pipeline', files: mk(`
+README.md:3100
+LICENSE:1070
+.gitignore:200
+pyproject.toml:1400
+requirements.txt:380
+poetry.lock:96000
+.flake8:90
+Makefile:620
+.github/workflows/test.yml:760
+configs/train.yaml:1100
+configs/eval.yaml:700
+notebooks/exploration.ipynb:412000
+docs/usage.md:2600
+src/pipeline/__init__.py:200
+src/pipeline/ingest.py:6200
+src/pipeline/features.py:11800
+src/pipeline/train.py:9700
+src/pipeline/evaluate.py:7400
+src/pipeline/serve.py:5300
+src/pipeline/utils.py:3100
+src/pipeline/models/baseline.py:4800
+src/pipeline/models/transformer.py:14900
+tests/test_features.py:4100
+tests/test_train.py:3600
+data/sample.csv:58000
+scripts/download_data.sh:900`),
+    languages: { Python: 66000, Shell: 900, Makefile: 620 },
+    weekly: weeks(52, i => (i % 9 < 3) ? 11 + (i % 4) * 3 : 1 + (i % 3)),
+    meta: { full_name: 'sample/ml-pipeline', description: 'Training and serving pipeline for a text classifier. Bundled sample data.', license: 'Apache-2.0', default_branch: 'main', pushed_at: daysAgo(41) }
+  };
+}
+</script>
+
+<script>
+/* ---------- UI ---------- */
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+const compact = n => new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(n);
+const STEPS = ['Resolve repository', 'Read language breakdown', 'Walk the file tree', 'Load commit history', 'Score health'];
+const state = { data: null, res: null, running: false, tm: null };
+
+class AppError extends Error {}
+
+/* theme */
+const root = document.documentElement;
+function isDark() { const t = root.getAttribute('data-theme'); return t ? t === 'dark' : !matchMedia('(prefers-color-scheme: light)').matches; }
+function syncThemeBtn() { $('#themeBtn').textContent = isDark() ? 'Light mode' : 'Dark mode'; }
+$('#themeBtn').addEventListener('click', () => {
+  const next = isDark() ? 'light' : 'dark';
+  root.setAttribute('data-theme', next);
+  try { localStorage.setItem('repolens-theme', next); } catch (e) {}
+  syncThemeBtn();
+});
+try { const t = localStorage.getItem('repolens-theme'); if (t === 'light' || t === 'dark') root.setAttribute('data-theme', t); } catch (e) {}
+syncThemeBtn();
+
+/* notices & progress */
+function notice(msg, kind) {
+  const n = $('#notice');
+  if (!msg) { n.hidden = true; return; }
+  n.textContent = msg; n.className = 'notice' + (kind === 'info' ? ' info' : ''); n.hidden = false;
+}
+function stepsInit(sub) {
+  $('#progressSub').textContent = sub;
+  $('#steps').innerHTML = STEPS.map(s => '<li data-state="pending"><span class="dot"></span><span>' + s + '</span><span class="ms"></span></li>').join('');
+  $('#progress').hidden = false;
+}
+function setStep(i, st, ms) {
+  const li = $('#steps').children[i]; if (!li) return;
+  li.dataset.state = st; if (ms) li.querySelector('.ms').textContent = ms;
+}
+async function timed(i, fn) {
+  setStep(i, 'active'); const t = performance.now();
+  try { const v = await fn(); setStep(i, 'done', Math.round(performance.now() - t) + ' ms'); return v; }
+  catch (e) { setStep(i, 'fail'); throw e; }
+}
+
+/* GitHub */
+async function gh(path, st) {
+  const r = await fetch('https://api.github.com' + path, { headers: { Accept: 'application/vnd.github+json' } });
+  st.remaining = r.headers.get('x-ratelimit-remaining'); st.limit = r.headers.get('x-ratelimit-limit'); st.reset = r.headers.get('x-ratelimit-reset');
+  return r;
+}
+function limitError(st) {
+  let when = '';
+  if (st.reset) when = ' Try again after ' + new Date(+st.reset * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + '.';
+  return new AppError('GitHub rate limit reached (60 requests per hour without a token).' + when);
+}
+async function runLive(owner, repo) {
+  const st = {}; const d = { sample: false };
+  stepsInit('Fetching from api.github.com');
+  const meta = await timed(0, async () => {
+    const r = await gh('/repos/' + owner + '/' + repo, st);
+    if (r.status === 404) throw new AppError('Repository not found. Check the spelling, and note that private repositories cannot be analyzed.');
+    if (r.status === 403 || r.status === 429) throw limitError(st);
+    if (!r.ok) throw new AppError('GitHub returned status ' + r.status + '.');
+    return r.json();
+  });
+  d.meta = meta;
+  d.languages = await timed(1, async () => {
+    const r = await gh('/repos/' + meta.full_name + '/languages', st);
+    return r.ok ? r.json() : {};
+  });
+  const tree = await timed(2, async () => {
+    const r = await gh('/repos/' + meta.full_name + '/git/trees/' + encodeURIComponent(meta.default_branch) + '?recursive=1', st);
+    if (r.status === 403 || r.status === 429) throw limitError(st);
+    if (!r.ok) throw new AppError('Could not read the file tree (status ' + r.status + '). The repository may be empty.');
+    return r.json();
+  });
+  d.files = (tree.tree || []).filter(t => t.type === 'blob').map(t => ({ path: t.path, size: t.size || 0 }));
+  d.truncated = !!tree.truncated;
+  d.weekly = await timed(3, async () => {
+    for (let i = 0; i < 3; i++) {
+      const r = await gh('/repos/' + meta.full_name + '/stats/commit_activity', st);
+      if (r.status === 202) { await sleep(1500); continue; }
+      if (r.ok) { const a = await r.json(); if (Array.isArray(a) && a.length) return a.map(w => ({ week: w.week, total: w.total })); }
+      break;
+    }
+    return null;
+  });
+  d.api = st;
+  return d;
+}
+async function runSample(key, instant) {
+  const d = buildSample(key);
+  if (!instant) {
+    stepsInit('Using bundled sample data, no network calls');
+    for (let i = 0; i < 4; i++) await timed(i, () => sleep(220));
+  }
+  return d;
+}
+
+/* rendering */
+function band(s) { return s >= 70 ? 'good' : s >= 45 ? 'warn' : 'bad'; }
+function bandWord(s) { return s >= 85 ? 'Excellent' : s >= 70 ? 'Solid' : s >= 55 ? 'Fair' : s >= 40 ? 'Needs work' : 'At risk'; }
+
+function renderReport(data, res, animate) {
+  state.data = data; state.res = res;
+  const f = res.f, m = data.meta;
+  $('#report').hidden = false;
+  $('#rName').textContent = m.full_name;
+  $('#rBadge').hidden = !data.sample;
+  $('#rDesc').textContent = m.description || 'No description provided.';
+  const facts = [];
+  if (!data.sample && m.stargazers_count != null) facts.push('<b>' + compact(m.stargazers_count) + '</b> stars', '<b>' + compact(m.forks_count) + '</b> forks', '<b>' + compact(m.open_issues_count) + '</b> open issues');
+  facts.push('License <b>' + esc(m.license ? (m.license.spdx_id || m.license.name || m.license) : 'none') + '</b>');
+  facts.push('Branch <b>' + esc(m.default_branch) + '</b>', 'Pushed <b>' + esc(f.pushedAgo) + '</b>', '<b>' + f.total.toLocaleString() + '</b> files');
+  if (data.api && data.api.remaining != null) facts.push('API calls left <b>' + esc(data.api.remaining) + '/' + esc(data.api.limit) + '</b>');
+  $('#rFacts').innerHTML = facts.map(x => '<li>' + x + '</li>').join('');
+  const loc = Math.round(f.srcBytes / 38);
+  $('#rStats').innerHTML = [[f.srcCount.toLocaleString(), 'Source files'], [f.testCount.toLocaleString(), 'Test files'], ['~' + compact(loc), 'Lines of code'], [f.dirCount.toLocaleString(), 'Folders']].map(x => '<div class="stat"><b>' + x[0] + '</b><span>' + x[1] + '</span></div>').join('');
+  $('#copyMsg').textContent = '';
+
+  // score ring
+  const C = 2 * Math.PI * 52, arc = $('#ringArc');
+  arc.style.stroke = 'var(--' + band(res.overall) + ')';
+  arc.setAttribute('stroke-dasharray', C);
+  const target = C * (1 - res.overall / 100);
+  if (animate && !reduced()) { arc.setAttribute('stroke-dashoffset', C); requestAnimationFrame(() => requestAnimationFrame(() => arc.setAttribute('stroke-dashoffset', target))); }
+  else arc.setAttribute('stroke-dashoffset', target);
+  $('#ringNum').textContent = res.overall;
+  $('#gradeWord').textContent = bandWord(res.overall);
+  $('#bars').innerHTML = res.subs.map(s =>
+    '<li><div class="brow"><span>' + s.label + '</span><span class="bv">' + s.score + '</span></div>' +
+    '<div class="track"><div class="fill ' + band(s.score) + '" style="width:' + s.score + '%"></div></div>' +
+    '<p class="bn">' + esc(s.note) + '</p></li>').join('');
+
+  renderDonut(data.languages);
+  renderActivity(data.weekly, f);
+  renderTreemap();
+  renderFindings(res.notes);
+  renderLargest(res.own);
+  fxInit();
+}
+
+function renderDonut(langs) {
+  const el = $('#langs');
+  const entries = Object.entries(langs || {}).sort((a, b) => b[1] - a[1]);
+  const total = entries.reduce((t, e) => t + e[1], 0);
+  if (!total) { el.innerHTML = '<p class="empty">GitHub reports no language data for this repository.</p>'; return; }
+  const top = entries.slice(0, 6);
+  const rest = entries.slice(6).reduce((t, e) => t + e[1], 0);
+  if (rest > 0) top.push(['Other', rest]);
+  const R = 44, C = 2 * Math.PI * R; let acc = 0, segs = '', leg = '';
+  top.forEach((e, i) => {
+    const frac = e[1] / total, len = frac * C, gap = top.length > 1 ? Math.min(2.2, len * 0.2) : 0;
+    const dash = Math.max(len - gap, 0.1), color = e[0] === 'Other' ? 'var(--c8)' : 'var(--c' + (i + 1) + ')';
+    segs += '<circle cx="60" cy="60" r="' + R + '" fill="none" stroke="' + color + '" stroke-width="14" stroke-dasharray="' + dash + ' ' + (C - dash) + '" stroke-dashoffset="' + (-acc) + '"/>';
+    acc += len;
+    leg += '<li><span class="sw" style="background:' + color + '"></span><span class="ln">' + esc(e[0]) + '</span><span class="lp">' + (frac * 100).toFixed(frac < 0.1 ? 1 : 0) + '%</span></li>';
+  });
+  const lead = top[0];
+  el.innerHTML = '<div class="donutwrap"><svg class="donut" viewBox="0 0 120 120" role="img" aria-label="Language breakdown, led by ' + esc(lead[0]) + '"><g transform="rotate(-90 60 60)">' + segs + '</g></svg>' +
+    '<div class="dcenter"><b>' + Math.round(lead[1] / total * 100) + '%</b><span>' + esc(lead[0]) + '</span></div></div><ul class="legend">' + leg + '</ul>';
+}
+
+function renderActivity(weekly, f) {
+  const el = $('#activity');
+  if (!weekly) { el.innerHTML = '<p class="empty">Commit history was not available. GitHub may still be computing it, so try again in a minute.</p>'; return; }
+  const W = 520, H = 150, n = weekly.length, bw = W / n, max = Math.max(1, ...weekly.map(w => w.total));
+  let bars = '';
+  weekly.forEach((w, i) => {
+    const h = w.total ? Math.max(3, w.total / max * (H - 8)) : 2;
+    const last = i === n - 1;
+    bars += '<rect x="' + (i * bw + 1).toFixed(2) + '" y="' + (H - h).toFixed(2) + '" width="' + (bw - 2).toFixed(2) + '" height="' + h.toFixed(2) + '" rx="1" fill="var(--accent)" opacity="' + (w.total ? (last ? 1 : 0.7) : 0.18) + '"/>';
+  });
+  const fmt = t => new Date(t * 1000).toLocaleDateString('en', { month: 'short', year: '2-digit' });
+  const totalYear = weekly.reduce((t, w) => t + w.total, 0);
+  el.innerHTML = '<svg class="actchart" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" role="img" aria-label="Weekly commits over the last year, peak ' + max + '">' +
+    '<line x1="0" y1="' + H + '" x2="' + W + '" y2="' + H + '" stroke="var(--line)" stroke-width="1"/>' + bars + '</svg>' +
+    '<div class="axis"><span>' + fmt(weekly[0].week) + '</span><span>peak ' + max + ' / week</span><span>' + fmt(weekly[n - 1].week) + '</span></div>' +
+    '<p class="actmeta"><span><b>' + totalYear.toLocaleString() + '</b> commits in 52 weeks</span><span><b>' + f.activeWeeks + '</b> of the last 26 weeks active</span></p>';
+}
+
+function tmPrepare() {
+  const pool = state.res.own.filter(x => x.type === 'source' || x.type === 'test').sort((a, b) => b.size - a.size).slice(0, 45);
+  const dirOf = p => p.includes('/') ? p.split('/')[0] : '(root)';
+  const bytes = {};
+  pool.forEach(x => { const k = dirOf(x.path); bytes[k] = (bytes[k] || 0) + x.size; });
+  const ranked = Object.entries(bytes).sort((a, b) => b[1] - a[1]);
+  const colorOf = {}; ranked.forEach((e, i) => { colorOf[e[0]] = i < 6 ? 'var(--c' + (i + 1) + ')' : 'var(--c8)'; });
+  const totalB = sum(pool, 'size') || 1;
+  return { pool, dirOf, colorOf, ranked, totalB };
+}
+function renderTreemap() {
+  const box = $('#treemap');
+  const t = state.tm = tmPrepare();
+  if (!t.pool.length) { box.innerHTML = '<p class="empty" style="padding:20px">No source files were recognised in this repository.</p>'; $('#tmLegend').innerHTML = ''; $('#tmInfo').textContent = ''; return; }
+  drawTreemap();
+  $('#tmLegend').innerHTML = t.ranked.slice(0, 7).map(e =>
+    '<li><span class="sw" style="background:' + t.colorOf[e[0]] + '"></span><span class="ln">' + esc(e[0]) + '</span><span class="lp">' + Math.round(e[1] / t.totalB * 100) + '%</span></li>').join('');
+  $('#tmInfo').textContent = 'Showing the ' + t.pool.length + ' largest source and test files.';
+}
+function drawTreemap() {
+  const box = $('#treemap'), t = state.tm; if (!t || !t.pool.length) return;
+  const w = box.clientWidth, h = box.clientHeight; if (!w || !h) return;
+  const cells = squarify(t.pool.map(x => ({ value: x.size, f: x })), 0, 0, w, h);
+  box.innerHTML = cells.map((c, i) => {
+    const x = c.f, base = x.path.split('/').pop(), big = c.w > 74 && c.h > 34;
+    return '<div class="cell" tabindex="0" data-i="' + i + '" style="--cc:' + t.colorOf[t.dirOf(x.path)] + ';left:' + c.x.toFixed(1) + 'px;top:' + c.y.toFixed(1) + 'px;width:' + c.w.toFixed(1) + 'px;height:' + c.h.toFixed(1) + 'px" aria-label="' + esc(x.path) + ', ' + fmtBytes(x.size) + '">' +
+      (big ? '<span class="cn">' + esc(base) + '</span>' + (c.h > 48 ? '<span class="cs">' + fmtBytes(x.size) + '</span>' : '') : '') + '</div>';
+  }).join('');
+  t.cells = cells;
+}
+const tmShow = e => {
+  const c = e.target.closest && e.target.closest('.cell'); if (!c || !state.tm || !state.tm.cells) return;
+  const x = state.tm.cells[+c.dataset.i].f;
+  $('#tmInfo').textContent = x.path + '  ·  ' + fmtBytes(x.size) + '  ·  ' + x.type;
+};
+$('#treemap').addEventListener('mouseover', tmShow);
+$('#treemap').addEventListener('focusin', tmShow);
+let rzT; new ResizeObserver(() => { clearTimeout(rzT); rzT = setTimeout(() => { if (state.data) drawTreemap(); }, 80); }).observe($('#treemap'));
+
+function renderFindings(n) {
+  const grp = (cls, title, list) => list.length ? '<div class="fgroup"><h3><span class="pill ' + cls + '">' + title + '</span></h3><ul>' + list.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul></div>' : '';
+  const html = grp('good', 'Strengths', n.S) + grp('bad', 'Risks', n.R) + grp('tip', 'Next steps', n.T);
+  $('#findings').innerHTML = html || '<p class="empty">No notable findings.</p>';
+}
+function renderLargest(own) {
+  const top = own.filter(x => x.type !== 'lock').sort((a, b) => b.size - a.size).slice(0, 8);
+  const max = top.length ? top[0].size : 1;
+  $('#largest').innerHTML = top.map(x =>
+    '<li><div class="row"><span class="pth" title="' + esc(x.path) + '">' + esc(x.path) + '</span><span class="sz">' + fmtBytes(x.size) + '</span></div>' +
+    '<div class="track"><div class="fill" style="width:' + (x.size / max * 100).toFixed(1) + '%;background:var(--c8)"></div></div></li>').join('') || '<li class="empty">No files.</li>';
+}
+
+/* file explorer */
+function fxInit() { $('#fxQ').value = ''; $('#fxType').value = 'all'; fxRender(); }
+function fxRender() {
+  const q = $('#fxQ').value.trim().toLowerCase(), ty = $('#fxType').value;
+  const list = state.res.own.filter(x => (ty === 'all' || x.type === ty) && (!q || x.path.toLowerCase().includes(q))).sort((a, b) => a.path.localeCompare(b.path));
+  const shown = list.slice(0, 150);
+  $('#fxCount').textContent = 'Showing ' + shown.length + ' of ' + list.length.toLocaleString() + ' files';
+  $('#fxList').innerHTML = shown.map(x => {
+    const i = x.path.lastIndexOf('/'), dir = i >= 0 ? x.path.slice(0, i + 1) : '', base = x.path.slice(i + 1);
+    return '<div class="fxrow"><span class="tag t-' + x.type + '">' + (x.type === 'source' ? 'src' : x.type) + '</span><span class="p" title="' + esc(x.path) + '"><em>' + esc(dir) + '</em>' + esc(base) + '</span><span class="s">' + fmtBytes(x.size) + '</span></div>';
+  }).join('') || '<p class="empty" style="padding:14px">No files match.</p>';
+}
+$('#fxQ').addEventListener('input', () => fxRender());
+$('#fxType').addEventListener('change', () => fxRender());
+
+/* share */
+$('#copyBtn').addEventListener('click', async () => {
+  const name = state.data.meta.full_name;
+  let url = '?repo=' + encodeURIComponent(name).replace('%2F', '/');
+  try { url = location.origin + location.pathname + url; } catch (e) {}
+  try { await navigator.clipboard.writeText(url); $('#copyMsg').textContent = 'Link copied.'; }
+  catch (e) { $('#copyMsg').textContent = url; }
+});
+
+/* run */
+function setBusy(b) { state.running = b; $('#goBtn').disabled = b; $('#goBtn').textContent = b ? 'Analyzing…' : 'Analyze'; }
+function markChip(key) { document.querySelectorAll('.chip').forEach(c => c.setAttribute('aria-pressed', String(c.dataset.key === key))); }
+
+async function go(input, opts) {
+  opts = opts || {};
+  if (state.running) return;
+  notice('');
+  const p = parseRepo(input);
+  if (!p) { notice('Enter a repository as owner/name or paste a github.com link.', 'warn'); return; }
+  setBusy(true);
+  const isSample = p.owner.toLowerCase() === 'sample' && SAMPLE_LIST.some(s => s.key === p.repo);
+  try {
+    const data = isSample ? await runSample(p.repo, opts.instant) : await runLive(p.owner, p.repo);
+    setStep(4, 'active');
+    const t = performance.now(); const res = analyze(data);
+    renderReport(data, res, !opts.instant);
+    setStep(4, 'done', Math.max(1, Math.round(performance.now() - t)) + ' ms');
+    markChip(isSample ? p.repo : '');
+    if (isSample && opts.instant) { $('#progress').hidden = true; notice('Showing the bundled inventory-api sample. Paste any public repository above to analyze a real one.', 'info'); }
+    else if (isSample) notice('This is bundled sample data, not a real repository.', 'info');
+    if (opts.scroll) $('#report').scrollIntoView({ behavior: reduced() ? 'auto' : 'smooth', block: 'start' });
+  } catch (e) {
+    $('#progress').hidden = !!opts.instant;
+    if (e instanceof AppError) notice(e.message, 'warn');
+    else notice('Could not reach api.github.com from this page (blocked or offline). The sample projects still work. When hosted on Replit or any static host, this page analyzes real repositories.', 'warn');
+  } finally { setBusy(false); }
+}
+
+$('#form').addEventListener('submit', e => { e.preventDefault(); go($('#repoInput').value, { scroll: true }); });
+$('#chips').innerHTML += SAMPLE_LIST.map(s => '<button type="button" class="chip" data-key="' + s.key + '" aria-pressed="false">' + s.label + '</button>').join('');
+$('#chips').addEventListener('click', e => {
+  const b = e.target.closest('.chip'); if (!b) return;
+  $('#repoInput').value = 'sample/' + b.dataset.key;
+  go('sample/' + b.dataset.key, { scroll: true });
+});
+
+(function init() {
+  let q = null;
+  try { q = new URLSearchParams(location.search).get('repo'); } catch (e) {}
+  if (q) { $('#repoInput').value = q; go(q, { scroll: false }); }
+  else go('sample/inventory-api', { instant: true });
+})();
+</script>
+
+</body></html>
